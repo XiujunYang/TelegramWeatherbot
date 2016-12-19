@@ -1,18 +1,9 @@
 package com.weatherbot.example;
 
 import com.weatherbot.example.BotConfig;
-/*import org.telegram.Commands;
-import org.telegram.database.DatabaseManager;
-import org.telegram.services.CustomTimerTask;
-import org.telegram.services.Emoji;
-import org.telegram.services.LocalisationService;
-import org.telegram.services.TimerExecutor;
-import org.telegram.services.WeatherService;
-import org.telegram.structure.WeatherAlert;*/
 import org.telegram.telegrambots.api.methods.send.SendMessage;
 import org.telegram.telegrambots.api.objects.Message;
 import org.telegram.telegrambots.api.objects.Update;
-//import org.telegram.telegrambots.api.objects.replykeyboard.ReplyKeyboardHide;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.exceptions.TelegramApiException;
 import org.telegram.telegrambots.logging.BotLogger;
