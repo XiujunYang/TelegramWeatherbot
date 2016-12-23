@@ -17,15 +17,15 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
-
+import java.sql.SQLException;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
 /**
  * Receive bot message, and handle command to reply information by RSS.
  * @author Xiujun Yang
- * @version 1.0
- * @date 19th Dec 2016
+ * @version 1.1
+ * @date 23th Dec 2016
  */
 public class WeatherHandlers extends TelegramLongPollingBot {
     private static final String LOGTAG = "WEATHERHANDLERS";
@@ -39,13 +39,18 @@ public class WeatherHandlers extends TelegramLongPollingBot {
     private final int COMMAND_LANGUAGE_CHANGE_TO_EN = 5;
     private final int COMMAND_LANGUAGE_CHANGE_TO_CN = 6;
     
-    static {
-        MyConnection dbConn = new MyConnection();
-    }
+    MyConnection db;
+    private static WeatherHandlers instance;
 
     public WeatherHandlers() {
         super();
         //startAlertTimers();
+        db =  MyConnection.getInstance();
+    }
+    
+    public static WeatherHandlers getInstance(){
+        if(instance == null) instance = new WeatherHandlers();
+        return instance;
     }
 
     @Override
@@ -59,7 +64,8 @@ public class WeatherHandlers extends TelegramLongPollingBot {
             if (update.hasMessage()) {
                 Message message = update.getMessage();
                 if (message.hasText() || message.hasLocation()) {
-                    BotLogger.info(LOGTAG,"chatId["+message.getChatId()+"], "+"messageId["+message.getMessageId()+"] : "+message.getText());
+                    BotLogger.info(LOGTAG,"chatId["+message.getChatId()+"], "+"messageId["
+                            +message.getMessageId()+"] : "+message.getText());
                     handleIncomingMessage(message);
                 }
             }
@@ -72,7 +78,6 @@ public class WeatherHandlers extends TelegramLongPollingBot {
     public String getBotUsername() {
         return null;
     }
-
     
     /**
      * Check if it's a command.
@@ -82,19 +87,19 @@ public class WeatherHandlers extends TelegramLongPollingBot {
      */
     private int isCommand(String str){
         String command = new String(str).trim().toLowerCase();
-        if(command.contentEquals("topics")) {
+        if(command.contentEquals("/topics")) {
             return COMMAND_DESCRIPTION;
-        } else if(command.contentEquals("tellme current")) {
+        } else if(command.contentEquals("/tellme current")) {
             return COMMAND_TELLMECURRENT;
-        } else if(command.contentEquals("tellme warning")) {
+        } else if(command.contentEquals("/tellme warning")) {
             return COMMAND_TELLMEWARNING;
-        } else if(command.startsWith("subscribe")){
+        } else if(command.equals("/subscribe")){
             return COMMAND_SUBSCRIBE;
-        } else if(command.startsWith("unsubscribe")){
+        } else if(command.equals("/unsubscribe")){
             return COMMAND_UNSUBSCRIBE;
-        } else if(command.contentEquals("ÁπÅÈ?‰∏≠Ê?")){
+        } else if(command.contentEquals("/ÁπÅÈ?‰∏≠Ê?")){
             return COMMAND_LANGUAGE_CHANGE_TO_CN;
-        } else if(command.contentEquals("English")){
+        } else if(command.contentEquals("/English")){
             return COMMAND_LANGUAGE_CHANGE_TO_EN;
         }
         return NOT_A_COMMAND;
@@ -104,16 +109,19 @@ public class WeatherHandlers extends TelegramLongPollingBot {
      * Incoming messages handlers
      * @param message
      * @throws TelegramApiException
+     * @throws SQLException 
      */
-    private void handleIncomingMessage(Message message) throws TelegramApiException {
+    private void handleIncomingMessage(Message message) throws TelegramApiException, SQLException {
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(message.getChatId().toString());
+        String log=null;
+        if (message.isUserMessage()) log = "UserChat";
+        else if(message.isGroupMessage()) log = "GroupChat";
+        BotLogger.info(LOGTAG, log+", User:"+message.getFrom().getUserName()+"("+message.getFrom().getId()+")");
         sendMessage.setReplyToMessageId(message.getMessageId());
-        sendMessage.enableMarkdown(true); 
-        //BotLogger.info(LOGTAG,"Jean_"+message.getFrom().toString());
         String replyStr;
-        if (message.isUserMessage() && message.hasText()) {
-            //BotLogger.info(LOGTAG,isCommand(message.getText().toString()));
+        boolean result;
+        if (message.hasText()) {
             switch(isCommand(message.getText())) {
                 case COMMAND_DESCRIPTION:
                     //command:topics
@@ -141,12 +149,26 @@ public class WeatherHandlers extends TelegramLongPollingBot {
                     BotLogger.info(LOGTAG,"COMMAND_TELLMEWARNING REPLY:"+replyStr);
                     break;
                 case COMMAND_SUBSCRIBE:
-                    //command:subscribe warning
-                    sendMessage.setText("COMMAND_SUBSCRIBE");
+                    //command:subscribe
+                    boolean isGroup = message.isGroupMessage();
+                    long subscriber = message.getChatId();
+                    String userName = null, userFirstName = null, userLastName = null;
+                    if(!isGroup){
+                        userName = message.getFrom().getUserName();
+                        userFirstName = message.getFrom().getFirstName();
+                        userLastName = message.getFrom().getLastName();
+                        //BotLogger.info(LOGTAG, "userName="+userName+",userFirstName="+userFirstName+",userLastName="+userLastName);
+                    }
+                    result = db.addSubscriber(subscriber, userFirstName, userLastName, userName, isGroup);
+                    if (result) sendMessage.setText("COMMAND SUBSCRIBE Successfully.");
+                    else sendMessage.setText("Unfortunately! COMMAND SUBSCRIBE Failed.");
                     break;
                 case COMMAND_UNSUBSCRIBE:
-                    //command:unsubscribe warning
-                    sendMessage.setText("COMMAND_UNSUBSCRIBE");
+                    //command:unsubscribe
+                    Long unsubscriber = message.getChatId();
+                    result = db.removeSubscriber(unsubscriber);
+                    if (result) sendMessage.setText("COMMAND UNSUBSCRIBE Successfully.");
+                    else sendMessage.setText("Unfortunately! COMMAND UNSUBSCRIBE Failed.");
                     break;
                 case COMMAND_LANGUAGE_CHANGE_TO_EN:
                     //command:English
@@ -157,7 +179,8 @@ public class WeatherHandlers extends TelegramLongPollingBot {
                     sendMessage.setText("?•È?‰∫?);
                     break;
                 default:
-                    sendMessage.setText("Please use Following keyword: 1.topics; 2.subscribe/unsubscribe; 3.tellme");
+                    sendMessage.setText("You could use following command: 1./topics,  2./subscribe,  3./unsubscribe,  "
+                            + "4./tellme current,  5./tellme warning");
                     BotLogger.info(LOGTAG,"REPLY:default");
             }
             sendMessage(sendMessage);
@@ -169,7 +192,7 @@ public class WeatherHandlers extends TelegramLongPollingBot {
      * @param rssUrl Here use xml type's RSS
      * @return a string reply to telegram weather bot
      */
-    private String getXmlParsedInfo(String rssUrl) {
+    String getXmlParsedInfo(String rssUrl) {
         String sourceCode = null;
         try{
             DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
@@ -244,5 +267,4 @@ public class WeatherHandlers extends TelegramLongPollingBot {
             return null;
         }
     }
-    
 }
