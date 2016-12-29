@@ -97,7 +97,7 @@ public class WeatherHandlers extends TelegramLongPollingBot {
             return COMMAND_SUBSCRIBE;
         } else if(command.equals("/unsubscribe")){
             return COMMAND_UNSUBSCRIBE;
-        } else if(command.contentEquals("/ÁπÅÈ?‰∏≠Ê?")){
+        } else if(command.contentEquals("/Chinese")){
             return COMMAND_LANGUAGE_CHANGE_TO_CN;
         } else if(command.contentEquals("/English")){
             return COMMAND_LANGUAGE_CHANGE_TO_EN;
@@ -140,8 +140,8 @@ public class WeatherHandlers extends TelegramLongPollingBot {
                      * https://core.telegram.org/bots/api/#keyboardbutton
                     Array<KeyboardButton> btnList = new Array<KeyboardButton>(3);
                     KeyboardButton btnEN = new KeyboardButton("English");
-                    KeyboardButton btnTC = new KeyboardButton("ÁπÅÈ?‰∏≠Ê?");
-                    KeyboardButton btnSC = new KeyboardButton("Á∞°È?‰∏≠Ê?");
+                    KeyboardButton btnTC = new KeyboardButton("Traditional Chinese");
+                    KeyboardButton btnSC = new KeyboardButton("Simplified Chinese");
                     btnEN.setRequestLocation(true);
                     */
                     replyStr = getXmlParsedInfo(BotConfig.WEATHER_WARNING_SUMMARY_EN);
@@ -175,8 +175,8 @@ public class WeatherHandlers extends TelegramLongPollingBot {
                     sendMessage.setText("OK");
                     break;
                 case COMMAND_LANGUAGE_CHANGE_TO_CN:
-                    //command:ÁπÅÈ?‰∏≠Ê?/ÁÆÄ‰Ωì‰∏≠??Traditional Chinese/Simplified Chinese)
-                    sendMessage.setText("?•È?‰∫?);
+                    //command:Traditional Chinese/Simplified Chinese
+                    sendMessage.setText("Change to Traditional Chinese/Simplified Chinese");
                     break;
                 default:
                     sendMessage.setText("You could use following command: 1./topics,  2./subscribe,  3./unsubscribe,  "
