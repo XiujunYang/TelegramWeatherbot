@@ -2,6 +2,7 @@ package com.weatherbot.example;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -12,9 +13,9 @@ import org.telegram.telegrambots.logging.BotLogger;
 
 /**
  * This is used to create table and update database by SQLLite. It could record who is subscribed.
- * @version 1.1
+ * @version 1.2
  * @author Xiujun Yang
- * @date 23th Dec 2016
+ * @date 3rd Jan 2017
  */
 public class MyConnection {
     private final String LOGTAG = "MyConnection";
@@ -29,6 +30,8 @@ public class MyConnection {
     private static MyConnection instance;
     private static Connection conn;
     private static Statement stmt;
+    // Prevent SQL injection by Parameterized Statement
+    private static PreparedStatement ps = null;
     private boolean isTableExisted;
     private State dbState = State.NONE;
     public enum State{NONE, INITIATED, CONNECTED, DATALOADED, DISCONNECTED};
@@ -113,7 +116,7 @@ public class MyConnection {
             throw new SQLException("statement is null");
         }
         String tableInitSql = "CREATE TABLE " +tableName+
-                " ("+DB_COL_USERID+"        VARCHAR(20) NOT NULL, " + 
+                " ("+DB_COL_USERID+"        INTEGER(20) NOT NULL, " + 
                     DB_COL_FIRSTNAME+"      TEXT, " + 
                     DB_COL_LASTNAME+"       TEXT, " + 
                     DB_COL_USERNAME+"       TEXT, " +
@@ -142,11 +145,16 @@ public class MyConnection {
     }
     
     synchronized public void loadSubscriberFromDB(){
-        // Clean all local data and reload from database. 
-        if(subscriberList.size() !=0) {
-            for(int i=0; i<subscriberList.size(); i++) subscriberList.remove(i);
+        ArrayList<Subscriber> tempList = new ArrayList<Subscriber>();
+        try {
+            tempList = queryDBSubscriber();
+        } catch (SQLException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
         }
-        subscriberList.clone();
+        // Clean all local data and reload from database. 
+        subscriberList.clear();
+        subscriberList.addAll(tempList);
     }
     
     synchronized ArrayList<Subscriber> queryDBSubscriber() throws SQLException{
@@ -156,7 +164,7 @@ public class MyConnection {
         ArrayList<Subscriber> tempList = new ArrayList<Subscriber>();
         ResultSet rs = stmt.executeQuery("SELECT * FROM "+ tableName);
         while(rs.next()){
-            String chatId = rs.getString(DB_COL_USERID);
+            long chatId = rs.getLong(DB_COL_USERID);
             String firstName = rs.getString(DB_COL_FIRSTNAME);
             String lastName = rs.getString(DB_COL_LASTNAME);
             String userName = rs.getString(DB_COL_USERNAME);
@@ -165,8 +173,8 @@ public class MyConnection {
                     +",firstName:"+firstName+",lastName:"+lastName+",userName:"+userName
                     +", isGroup:"+ isGroup);
             Subscriber sub;
-            if(isGroup) sub = new Subscriber(Long.parseLong(chatId));
-            else sub = new Subscriber(Long.parseLong(chatId), userName, firstName, lastName);
+            if(isGroup) sub = new Subscriber(chatId);
+            else sub = new Subscriber(chatId, userName, firstName, lastName);
             tempList.add(sub);
         }
         return tempList;
@@ -178,7 +186,7 @@ public class MyConnection {
             Subscriber element = it.next();
             if(element.getChatId()==chatId) {
                 subscriberList.remove(element);
-                BotLogger.info(LOGTAG, "chatId("+chatId+") unsubscribed");
+                BotLogger.info(LOGTAG, "chatId["+chatId+"] unsubscribed");
                 boolean result = updateToDB();
                 if(!result) subscriberList.add(element);
                 return result;
@@ -188,12 +196,12 @@ public class MyConnection {
     }
     
     synchronized boolean updateToDB() throws SQLException{
-        if (stmt==null) {
-            throw new SQLException("statement is null");
+        if (conn==null) {
+            throw new SQLException("conn is null");
         }
         
         ArrayList<Subscriber> temp = queryDBSubscriber();
-        
+
         if(subscriberList.containsAll(temp)){
             //Data need to add in DB
             BotLogger.info(LOGTAG, "Data need to add in DB");
@@ -201,20 +209,25 @@ public class MyConnection {
             while(it.hasNext()){
                 Subscriber element = it.next();
                 if(! temp.contains(element)) {
-                    String insertSQL;
+                    String insertSQL = null;
                     if(element.isGroup()) {
                         insertSQL = "INSERT INTO "+ tableName + " ("+DB_COL_USERID+" ,"+DB_COL_GROUPFLAG+")"
-                                + " VALUES ('"+Long.toString(element.getChatId()) + "','"
-                                + (element.isGroup()?1:0)+ "')";
+                                + " VALUES (?,?)";
                     } else {
-                        insertSQL = "INSERT INTO "+ tableName + " ("+DB_COL_USERID+","+DB_COL_FIRSTNAME+", "
-                                + DB_COL_LASTNAME+", "+DB_COL_USERNAME+", "+DB_COL_GROUPFLAG+")"
-                                + " VALUES ('"+Long.toString(element.getChatId())+"','"+element.getFirstName()+
-                                "','"+element.getLastName()+"','"+element.getUserName()+ "','"+
-                                (element.isGroup()?1:0)+"')";
+                        insertSQL = "INSERT INTO "+ tableName + " ("+DB_COL_USERID+", "+DB_COL_GROUPFLAG+","
+                                + DB_COL_FIRSTNAME+", " + DB_COL_LASTNAME+", "+DB_COL_USERNAME+")"
+                                + " VALUES (?,?,?,?,?)";
                     }
-                    int result = stmt.executeUpdate(insertSQL);
-                    BotLogger.info(LOGTAG, "add to data: "+Integer.toString(result));
+                    ps = conn.prepareStatement(insertSQL);
+                    ps.setLong(1, element.getChatId());
+                    ps.setInt(2, element.isGroup()?1:0);
+                    if (!element.isGroup()){
+                        ps.setString(3, element.getFirstName());
+                        ps.setString(4, element.getLastName());
+                        ps.setString(5, element.getUserName());
+                    }
+                    int result = ps.executeUpdate();
+                    BotLogger.info(LOGTAG, "add to data: "+result);
                     return result==1;
                 }
             }
@@ -224,11 +237,12 @@ public class MyConnection {
             while(it.hasNext()){
                 Subscriber element = it.next();
                 if(!subscriberList.contains(element)){
-                    String deleteSQL = "DELETE FROM "+ tableName + " WHERE "+DB_COL_USERID+" = '" + 
-                            Long.toString(element.getChatId()) + "'";
-                    int result = stmt.executeUpdate(deleteSQL);
-                    BotLogger.info(LOGTAG, "delete from data: "+Integer.toString(result));
-                    return result==1;
+                    String deleteString = "DELETE FROM "+ tableName + " WHERE "+DB_COL_USERID+"= ?";
+                    ps = conn.prepareStatement(deleteString);
+                    ps.setLong(1, element.getChatId());
+                    int result = ps.executeUpdate();
+                    BotLogger.info(LOGTAG, "delete from data: "+result);
+                    return result ==1;
                 }
             }
         } else {
@@ -250,10 +264,14 @@ public class MyConnection {
     private void colseConnection(){
         if (conn == null) return;
         try {
+            ps.close();
             stmt.close();
             conn.close();
+            stmt = null;
+            conn = null;
             dbState = State.DISCONNECTED;
-        } catch (SQLException sqlex) {
+        } catch (Exception sqlex) {
+            // prevent both of NullPointException and SQLException
             sqlex.printStackTrace();
         }
         System.exit(0);

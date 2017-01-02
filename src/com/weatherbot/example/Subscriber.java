@@ -48,6 +48,7 @@ public class Subscriber {
         return isGroup;
     }
     
+    @Override
     // This could overwrite ArrarList.contains() and ArrarList.containsAll()
     public boolean equals(Object obj) {
         boolean retVal = false;
@@ -55,4 +56,11 @@ public class Subscriber {
             retVal = ((Subscriber) obj).getChatId() == this.chatId;
      return retVal;
   }
+    
+    @Override
+    public String toString(){
+        String returnStr = "Id["+chatId+"]; " + (isGroup?"Group-user":"Personal-user");
+        if(!isGroup) returnStr += "; UserName["+userName+"]; FirstName["+firstName+"]; LastName["+lastName+"]";
+        return returnStr;
+    }
 }
