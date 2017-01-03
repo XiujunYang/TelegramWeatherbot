@@ -34,7 +34,7 @@ public class MyConnection {
     private static PreparedStatement ps = null;
     private boolean isTableExisted;
     private State dbState = State.NONE;
-    public enum State{NONE, INITIATED, CONNECTED, DATALOADED, DISCONNECTED};
+    public enum State{NONE, CONNECTED, LOADED, DISCONNECTED};
     
     private ArrayList<Subscriber> subscriberList = new ArrayList<Subscriber>();
     
@@ -44,10 +44,16 @@ public class MyConnection {
     }
     
     public Connection init(){
-        if (instance == null) instance = new MyConnection();
-        if(conn == null) {
-            generateConnection();
+        if (instance == null) instance = getInstance();
+        boolean isConn = false;
+        try {
+            isConn = conn.isClosed();
+        } catch (SQLException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
         }
+        if(isConn || conn == null) generateConnection();
+
         try {
             stmt = conn.createStatement();
             isTableExisted = isTableExistedCheck(tableName);
@@ -58,7 +64,6 @@ public class MyConnection {
             ex.printStackTrace();
             colseConnection();
         }
-        dbState = State.INITIATED;
         return conn;
     }
     
@@ -148,13 +153,14 @@ public class MyConnection {
         ArrayList<Subscriber> tempList = new ArrayList<Subscriber>();
         try {
             tempList = queryDBSubscriber();
+            // Clean all local data and reload from database. 
+            subscriberList.clear();
+            subscriberList.addAll(tempList);
+            dbState = State.LOADED;
         } catch (SQLException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-        // Clean all local data and reload from database. 
-        subscriberList.clear();
-        subscriberList.addAll(tempList);
     }
     
     synchronized ArrayList<Subscriber> queryDBSubscriber() throws SQLException{

@@ -1,6 +1,7 @@
 package com.weatherbot.example;
 
 import com.weatherbot.example.BotConfig;
+import com.weatherbot.example.MyConnection.State;
 import org.telegram.telegrambots.api.methods.send.SendMessage;
 import org.telegram.telegrambots.api.objects.Message;
 import org.telegram.telegrambots.api.objects.Update;
@@ -46,6 +47,8 @@ public class WeatherHandlers extends TelegramLongPollingBot {
         super();
         //startAlertTimers();
         db =  MyConnection.getInstance();
+        // Do a protection if connection of database construct unsuccessfully by Main class.
+        if(db.getState()==State.NONE||db.getState()==State.DISCONNECTED) db.init();
     }
     
     public static WeatherHandlers getInstance(){

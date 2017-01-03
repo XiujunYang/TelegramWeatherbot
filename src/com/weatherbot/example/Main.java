@@ -22,6 +22,7 @@ public class Main {
     private static final String LOGTAG = "MAIN";
 
     public static void main(String[] args){
+        // TO load subscriber from database first while run this application.
         MyConnection dbConn = MyConnection.getInstance();
         dbConn.init();
         BotLogger.setLevel(Level.ALL);
