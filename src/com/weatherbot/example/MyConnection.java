@@ -47,7 +47,7 @@ public class MyConnection {
         if (instance == null) instance = getInstance();
         boolean isConn = false;
         try {
-            isConn = conn.isClosed();
+            if(conn != null) isConn = conn.isClosed();
         } catch (SQLException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
