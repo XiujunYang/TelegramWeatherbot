@@ -13,9 +13,9 @@ import org.telegram.telegrambots.logging.BotLogger;
 
 /**
  * This is used to create table and update database by SQLLite. It could record who is subscribed.
- * @version 1.2
+ * @version 1.3
  * @author Xiujun Yang
- * @date 3rd Jan 2017
+ * @date 9th Jan 2017
  */
 public class MyConnection {
     private final String LOGTAG = "MyConnection";
@@ -39,20 +39,25 @@ public class MyConnection {
     private ArrayList<Subscriber> subscriberList = new ArrayList<Subscriber>();
     
     public static MyConnection getInstance(){
-        if (instance == null) instance = new MyConnection();
+        if (instance == null) {
+            instance = new MyConnection();
+            instance.init();
+        }
         return instance;
     }
     
     public Connection init(){
+        // It doesn't need to do connection generation and load data
+        if(dbState == State.LOADED) return null;
         if (instance == null) instance = getInstance();
-        boolean isConn = false;
+        boolean isClosed = false;
         try {
-            if(conn != null) isConn = conn.isClosed();
+            if(conn != null) isClosed = conn.isClosed();
         } catch (SQLException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-        if(isConn || conn == null) generateConnection();
+        if(isClosed || conn == null) generateConnection();
 
         try {
             stmt = conn.createStatement();

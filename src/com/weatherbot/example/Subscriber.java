@@ -56,7 +56,7 @@ public class Subscriber {
             retVal = ((Subscriber) obj).getChatId() == this.chatId;
      return retVal;
   }
-    
+
     @Override
     public String toString(){
         String returnStr = "Id["+chatId+"]; " + (isGroup?"Group-user":"Personal-user");

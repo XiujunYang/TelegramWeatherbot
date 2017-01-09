@@ -7,6 +7,7 @@ import java.util.TimerTask;
 
 import org.telegram.telegrambots.api.methods.send.SendMessage;
 import org.telegram.telegrambots.exceptions.TelegramApiException;
+import org.telegram.telegrambots.logging.BotLogger;
 
 
 /**
@@ -19,13 +20,16 @@ public class WeatherWarningFeeder{
 
     public WeatherWarningFeeder(){
         Timer timer = new Timer();
+        /* Program will use same thread to run FeederTask.
+         * Run on different thread depended on Timer, not TimerTask */
         timer.scheduleAtFixedRate(new FeederTask(),0, 108000000);//30 mins = 108000 sec
     }
 
-
     class FeederTask extends TimerTask{
+        private final String LOGTAG = "FeederTask";
     
         public void run() {
+            BotLogger.debug(LOGTAG,"ThreadId:"+Thread.currentThread().getId());
             ArrayList<Subscriber> subscriberList = handler.db.getSubscribersList();
             Iterator<Subscriber> it = subscriberList.iterator();
             while(it.hasNext()){

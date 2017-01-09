@@ -19,14 +19,17 @@ import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.sql.SQLException;
+import java.util.Queue;
+import java.util.concurrent.LinkedBlockingQueue;
+
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
 /**
  * Receive bot message, and handle command to reply information by RSS.
  * @author Xiujun Yang
- * @version 1.1
- * @date 23th Dec 2016
+ * @version 1.2
+ * @date 9th Jan 2017
  */
 public class WeatherHandlers extends TelegramLongPollingBot {
     private static final String LOGTAG = "WEATHERHANDLERS";
@@ -42,13 +45,12 @@ public class WeatherHandlers extends TelegramLongPollingBot {
     
     MyConnection db;
     private static WeatherHandlers instance;
+    private Queue<Update> TMessageQueue = new LinkedBlockingQueue<Update>();
+    private myMsgHandler msgHandler = new myMsgHandler();
 
     public WeatherHandlers() {
         super();
-        //startAlertTimers();
-        db =  MyConnection.getInstance();
-        // Do a protection if connection of database construct unsuccessfully by Main class.
-        if(db.getState()==State.NONE||db.getState()==State.DISCONNECTED) db.init();
+        msgHandler.start();
     }
     
     public static WeatherHandlers getInstance(){
@@ -63,18 +65,8 @@ public class WeatherHandlers extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-        try {
-            if (update.hasMessage()) {
-                Message message = update.getMessage();
-                if (message.hasText() || message.hasLocation()) {
-                    BotLogger.info(LOGTAG,"chatId["+message.getChatId()+"], "+"messageId["
-                            +message.getMessageId()+"] : "+message.getText());
-                    handleIncomingMessage(message);
-                }
-            }
-        } catch (Exception e) {
-            BotLogger.error(LOGTAG, e);
-        }
+        TMessageQueue.add(update);
+        BotLogger.debug(LOGTAG,"onUpdateReceived ThreadId:"+Thread.currentThread().getId());
     }
 
     @Override
@@ -268,6 +260,35 @@ public class WeatherHandlers extends TelegramLongPollingBot {
             return null;
         } catch(IOException ioe){
             return null;
+        }
+    }
+    
+    public class myMsgHandler extends Thread{
+        private final String LOGTAG = "myMsgHandler";
+               
+        @Override
+        public void run(){
+            // Make sure MyConnection will run on this thread, not main-thread.
+            db =  MyConnection.getInstance();
+            BotLogger.debug(LOGTAG,"ThreadId:"+Thread.currentThread().getId());
+            while(true){
+                if(TMessageQueue.size() != 0){
+                    Update update = (Update) TMessageQueue.poll();
+                    try {
+                        if (update.hasMessage()) {
+                            Message message = update.getMessage();
+                            if (message.hasText() || message.hasLocation()) {
+                                BotLogger.info(LOGTAG,"chatId["+message.getChatId()+"], "+"messageId["
+                                        +message.getMessageId()+"] : "+message.getText());
+                                handleIncomingMessage(message);
+                            }
+                        }
+                    } catch (Exception e) {
+                        BotLogger.error(LOGTAG, e);
+                        continue;
+                    }
+                }
+            }
         }
     }
 }
