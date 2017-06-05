@@ -2,12 +2,29 @@ package com.weatherbot.example;
 
 import com.weatherbot.example.BotConfig;
 import com.weatherbot.example.MyConnection.State;
+
+/*import org.telegram.Commands;
+import org.telegram.database.DatabaseManager;
+import org.telegram.services.CustomTimerTask;
+import org.telegram.services.Emoji;
+import org.telegram.services.LocalisationService;
+import org.telegram.services.TimerExecutor;
+import org.telegram.services.WeatherService;
+import org.telegram.structure.WeatherAlert;*/
 import org.telegram.telegrambots.api.methods.send.SendMessage;
 import org.telegram.telegrambots.api.objects.Message;
 import org.telegram.telegrambots.api.objects.Update;
+//import org.telegram.telegrambots.api.objects.replykeyboard.ForceReplyKeyboard;
+//import org.telegram.telegrambots.api.objects.replykeyboard.ReplyKeyboard;
+//import org.telegram.telegrambots.api.objects.replykeyboard.ReplyKeyboardHide;
+//import org.telegram.telegrambots.api.objects.replykeyboard.ReplyKeyboardMarkup;
+//import org.telegram.telegrambots.api.objects.replykeyboard.buttons.KeyboardButton;
+//import org.telegram.telegrambots.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.exceptions.TelegramApiException;
+//import org.telegram.telegrambots.exceptions.TelegramApiRequestException;
 import org.telegram.telegrambots.logging.BotLogger;
+import org.w3c.dom.CharacterData;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -27,6 +44,9 @@ import javax.xml.parsers.DocumentBuilderFactory;
 
 /**
  * Receive bot message, and handle command to reply information by RSS.
+ * Curtomerize bot command and feedback, including parsing rss information.
+ * If user want to get current weather information actively, it will be handled here.
+ * If user want to subscribe, application will get chat or user info to the list.
  * @author Xiujun Yang
  * @version 1.2
  * @date 9th Jan 2017
@@ -120,17 +140,20 @@ public class WeatherHandlers extends TelegramLongPollingBot {
             switch(isCommand(message.getText())) {
                 case COMMAND_DESCRIPTION:
                     //command:topics
+                    BotLogger.info(LOGTAG, "GO TO DESCRIPTION");
                     sendMessage.setText("current, warning");
                     BotLogger.info(LOGTAG,"COMMAND_DESCRIPTION REPLY:current, warning");
                     break;
                 case COMMAND_TELLMECURRENT:
                     //command:tellme current
+                    BotLogger.info(LOGTAG, "GO TO TELLMECURRENT");
                     replyStr = getXmlParsedInfo(BotConfig.CURRENT_WEATHER_REPORT_EN);
                     sendMessage.setText(replyStr);
                     BotLogger.info(LOGTAG,"COMMAND_DESCRIPTION REPLY:"+replyStr);
                     break;
                 case COMMAND_TELLMEWARNING:
                     //command:tellme warning
+                    BotLogger.info(LOGTAG, "GO TO TELLMEWARNING");
                     /* Use to choose Language before replying.
                      * https://core.telegram.org/bots/api/#keyboardbutton
                     Array<KeyboardButton> btnList = new Array<KeyboardButton>(3);
@@ -145,6 +168,7 @@ public class WeatherHandlers extends TelegramLongPollingBot {
                     break;
                 case COMMAND_SUBSCRIBE:
                     //command:subscribe
+                    BotLogger.info(LOGTAG, "GO TO SUBSCRIBE");
                     boolean isGroup = message.isGroupMessage();
                     long subscriber = message.getChatId();
                     String userName = null, userFirstName = null, userLastName = null;
@@ -160,6 +184,7 @@ public class WeatherHandlers extends TelegramLongPollingBot {
                     break;
                 case COMMAND_UNSUBSCRIBE:
                     //command:unsubscribe
+                    BotLogger.info(LOGTAG, "GO TO UNSUBSCRIBE");
                     Long unsubscriber = message.getChatId();
                     result = db.removeSubscriber(unsubscriber);
                     if (result) sendMessage.setText("COMMAND UNSUBSCRIBE Successfully.");
@@ -193,23 +218,30 @@ public class WeatherHandlers extends TelegramLongPollingBot {
             DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
             DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
             Document doc = dBuilder.parse(rssUrl);
-            
+                     
             NodeList nList = doc.getElementsByTagName("item");
-            
+            Element element = (Element) nList.item(0);
+            nList = element.getChildNodes();
+                        
             for (int temp = 0; temp < nList.getLength(); temp++) {
                 Node nNode = nList.item(temp);
-                //System.out.println("\nCurrent Element :" + nNode.getNodeName());
+                //System.out.println("\nCurrent Node:" + nNode.getNodeName());
             
-                if (nNode.getNodeType() == Node.ELEMENT_NODE) {
-                    Element eElement = (Element) nNode;
-                    sourceCode = eElement.getElementsByTagName("description").item(0).getTextContent();
-                    //System.out.println(eElement.getElementsByTagName("description").item(0).getTextContent());
-              }
+                if (nNode.getNodeType() == Node.ELEMENT_NODE && nNode.getNodeName().equals("description")) {
+                    //System.out.println("\nCurrent Element node:" + nNode.getNodeName());
+                    if(rssUrl.equals(BotConfig.WEATHER_WARNING_SUMMARY_EN)){
+                        element = (Element) nNode;
+                        sourceCode = getCharacterDataFromElement(element);
+                    }else{
+                        sourceCode = getCurrentWeatherByParsingRawData();
+                    }
+                    //System.out.println("\nCurrent result:" + sourceCode);
+                }
             }
             
-            if(sourceCode.contains("<![CDATA["))
+            /*if(sourceCode.contains("<![CDATA["))
                 sourceCode = sourceCode.replace("<![CDATA[", "");
-            sourceCode = sourceCode.replaceAll("<p>|</p>", "");
+            sourceCode = sourceCode.replaceAll("<p>|</p>", "");*/
             sourceCode = sourceCode.replaceAll("<br/>", "\n");
             NodeList LanguageList = doc.getElementsByTagName("language");
             Element e = (Element) LanguageList.item(0);
@@ -219,6 +251,16 @@ public class WeatherHandlers extends TelegramLongPollingBot {
             e.printStackTrace();
             return null;
         }
+    }
+    
+    private String getCharacterDataFromElement(Element e) {
+        NodeList list = e.getChildNodes();
+        String data = "";
+        for (int i = 0; i < list.getLength(); i++) {
+            if (list.item(i) instanceof CharacterData)
+                data += ((CharacterData)list.item(i)).getData();
+        }
+        return data;
     }
     
     /**

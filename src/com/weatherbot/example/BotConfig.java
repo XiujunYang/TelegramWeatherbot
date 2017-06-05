@@ -15,5 +15,5 @@ public class BotConfig {
     public static final String WEATHER_WARNING_SUMMARY_TC="http://rss.weather.gov.hk/rss/WeatherWarningSummaryv2_uc.xml";
     public static final String WEATHER_WARNING_SUMMARY_SC="http://gbrss.weather.gov.hk/rss/WeatherWarningSummaryv2_uc.xml";
     
-    public static final String WEATHER_TOKEN = "<token>";
+    public static final String WEATHER_TOKEN = "252128428:AAGOlvaopraVgm0-iI-C0nNVG-9hOyYGgI0";
 }

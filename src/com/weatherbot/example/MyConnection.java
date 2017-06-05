@@ -1,6 +1,7 @@
 package com.weatherbot.example;
 
 import java.sql.Connection;
+//import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -19,6 +20,7 @@ import org.telegram.telegrambots.logging.BotLogger;
  */
 public class MyConnection {
     private final String LOGTAG = "MyConnection";
+    //private final String databaseName = "DatabaseForSubscriber";
     private final String tableName = "SubscriberList";
     
     private final String DB_COL_USERID = "USERID";
@@ -32,6 +34,7 @@ public class MyConnection {
     private static Statement stmt;
     // Prevent SQL injection by Parameterized Statement
     private static PreparedStatement ps = null;
+    //private static DatabaseMetaData dm;
     private boolean isTableExisted;
     private State dbState = State.NONE;
     public enum State{NONE, CONNECTED, LOADED, DISCONNECTED};

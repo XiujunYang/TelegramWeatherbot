@@ -3,6 +3,7 @@ package com.weatherbot.example;
 
 /**
  * User/Group object.
+ * A object about subscriber who reserved this weather bot.
  * @author Xiujun Yang
  * @Date 23th Dec 2016
  */
@@ -55,7 +56,7 @@ public class Subscriber {
         if (obj instanceof Subscriber)
             retVal = ((Subscriber) obj).getChatId() == this.chatId;
      return retVal;
-  }
+    }
 
     @Override
     public String toString(){
